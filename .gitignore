@@ -1,0 +1,44 @@
+# R specific
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+*.Rproj.user/
+
+# R package build artifacts
+*.tar.gz
+*.Rcheck/
+
+# Output files
+output/*.png
+output/*.rds
+output/*.csv
+*.png
+*.rds
+
+# Data files (keep sample data)
+data/*.xlsx
+!data/sample_*.xlsx
+
+# IDE
+.vscode/
+.idea/
+*.Rproj
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*~
+\#*\#
+.#*
+
+# renv
+renv/library/
+renv/staging/
+renv/python/
+renv/.lock

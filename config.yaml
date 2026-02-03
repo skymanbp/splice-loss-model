@@ -1,0 +1,84 @@
+# ============================================================
+# Splice Loss GLMM Model Configuration
+# ============================================================
+
+# Data settings
+data:
+  input_file: "data/splice_data.xlsx"
+  # Column name mapping from raw Excel to standardized names
+  column_mapping:
+    - fiber1
+    - fiber2
+    - splice_type
+    - test_no
+    - core_no
+    - ref
+    - result
+    - diff
+    - prooftest
+    - fiber1_dist_center
+    - fiber2_dist_center
+    - fiber1_pitch
+    - fiber2_pitch
+    - ffw
+    - unnamed
+  # Columns to remove
+  columns_to_remove:
+    - unnamed
+    - ref
+
+# Model settings
+model:
+  # Target variable
+  response: "result"
+
+  # Fixed effects for the final model
+  fixed_effects:
+    - splice_type
+    - fiber1_dist_center
+    - fiber2_dist_center
+    - pitch_diff
+    - avg_pitch
+    - core_no
+
+  # Random effects
+  random_effects:
+    - fiber1
+    - fiber2
+
+  # Use REML estimation
+  use_reml: true
+
+  # Confidence level for intervals
+  confidence_level: 0.95
+
+# Output settings
+output:
+  directory: "output"
+  model_file: "splice_loss_glmm_model.rds"
+  plots:
+    distribution: "splice_loss_distribution.png"
+    by_type: "splice_loss_by_type.png"
+    vs_distance: "splice_loss_vs_distance.png"
+    residuals: "residuals_vs_fitted.png"
+    qq_plot: "qq_plot.png"
+    actual_vs_predicted: "actual_vs_predicted.png"
+  # Plot dimensions
+  plot_width: 8
+  plot_height: 6
+
+# Visualization settings
+visualization:
+  theme: "minimal"
+  histogram_bins: 30
+  point_alpha: 0.5
+  colors:
+    primary: "steelblue"
+    secondary: "orange"
+    line: "red"
+
+# Logging
+logging:
+  verbose: true
+  save_summary: true
+  summary_file: "output/model_summary.txt"
