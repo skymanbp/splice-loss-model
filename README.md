@@ -162,12 +162,22 @@ The analysis generates:
 
 ## Running Tests
 
-```r
-# Install testthat if needed
-install.packages("testthat")
+From the repository root:
 
-# Run tests
-testthat::test_dir("tests/testthat")
+```bash
+Rscript tests/testthat.R
+```
+
+The runner locates the repository root, sources the `R/` modules, and then
+executes the `testthat` suite (a bare `testthat::test_dir()` would fail,
+because the tested functions live in sourced modules, not an installed
+package). Requires the `testthat`, `lme4`, `dplyr`, and `yaml` packages.
+
+Without a local R installation, run the suite in a container:
+
+```bash
+docker run --rm -v "$(pwd):/pkg" -w /pkg rocker/r2u:latest \
+  bash -c "install.r testthat lme4 dplyr yaml && Rscript tests/testthat.R"
 ```
 
 ## License

@@ -82,7 +82,9 @@ remove_columns <- function(df, columns_to_remove, verbose = TRUE) {
   existing_cols <- intersect(columns_to_remove, colnames(df))
 
   if (length(existing_cols) > 0) {
-    df <- df[, !(colnames(df) %in% existing_cols)]
+    # drop = FALSE: base-R data.frame subsetting would collapse a single
+    # remaining column to a vector; the contract is to return a data frame
+    df <- df[, !(colnames(df) %in% existing_cols), drop = FALSE]
     if (verbose) {
       log_message(sprintf("Removed columns: %s", paste(existing_cols, collapse = ", ")))
     }
