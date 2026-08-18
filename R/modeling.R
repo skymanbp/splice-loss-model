@@ -1,8 +1,8 @@
 # ============================================================
-# Modeling Functions for Splice Loss Mixed-Effects Model
+# Modeling Functions for Splice Loss GLMM Model
 # ============================================================
 
-#' Build multiple linear mixed-effects models for comparison
+#' Build multiple GLMM models (Gamma family, log link) for comparison
 #' @param df Processed data frame
 #' @param config Configuration list
 #' @param verbose Print messages
@@ -12,36 +12,38 @@ build_models <- function(df, config, verbose = TRUE) {
     stop("Package 'lme4' is required. Install with: install.packages('lme4')")
   }
 
-  if (verbose) log_message("Building mixed-effects models...")
+  if (verbose) log_message("Building GLMM models...")
 
-  use_reml <- config$model$use_reml
 
   # Model 1: Basic model
-  model1 <- lme4::lmer(
+  model1 <- lme4::glmer(
     result ~ splice_type + fiber2_dist_center + pitch_diff +
       (1 | fiber1) + (1 | fiber2),
     data = df,
-    REML = use_reml
+    family = Gamma(link = "log"),
+    control = lme4::glmerControl(optimizer = "bobyqa")
   )
   if (verbose) log_message("Model 1 (Basic) fitted")
 
   # Model 2: Extended model
-  model2 <- lme4::lmer(
+  model2 <- lme4::glmer(
     result ~ splice_type + fiber2_dist_center + fiber1_dist_center +
       pitch_diff + avg_pitch + core_no +
       (1 | fiber1) + (1 | fiber2),
     data = df,
-    REML = use_reml
+    family = Gamma(link = "log"),
+    control = lme4::glmerControl(optimizer = "bobyqa")
   )
   if (verbose) log_message("Model 2 (Extended) fitted")
 
   # Model 3: Model with interactions
-  model3 <- lme4::lmer(
+  model3 <- lme4::glmer(
     result ~ splice_type * fiber2_dist_center +
       fiber1_dist_center + pitch_diff + core_no +
       (1 | fiber1) + (1 | fiber2) + (1 | test_no),
     data = df,
-    REML = use_reml
+    family = Gamma(link = "log"),
+    control = lme4::glmerControl(optimizer = "bobyqa")
   )
   if (verbose) log_message("Model 3 (Interactions) fitted")
 

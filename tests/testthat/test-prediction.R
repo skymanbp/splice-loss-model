@@ -40,10 +40,10 @@ test_that("validate_prediction_data detects missing columns", {
 
   # Fit a simple model
   suppressWarnings({
-    model <- lme4::lmer(
+    model <- lme4::glmer(
       result ~ splice_type + fiber2_dist_center + (1 | fiber1),
       data = df,
-      REML = TRUE
+      family = Gamma(link = "log")
     )
   })
 
@@ -66,10 +66,10 @@ test_that("predict_splice_loss returns numeric predictions", {
   df <- create_mock_data()
 
   suppressWarnings({
-    model <- lme4::lmer(
+    model <- lme4::glmer(
       result ~ splice_type + fiber2_dist_center + (1 | fiber1),
       data = df,
-      REML = TRUE
+      family = Gamma(link = "log")
     )
   })
 
@@ -89,10 +89,10 @@ test_that("batch_predict handles multiple scenarios", {
   df <- create_mock_data()
 
   suppressWarnings({
-    model <- lme4::lmer(
+    model <- lme4::glmer(
       result ~ splice_type + fiber2_dist_center + (1 | fiber1),
       data = df,
-      REML = TRUE
+      family = Gamma(link = "log")
     )
   })
 

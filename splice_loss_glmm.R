@@ -1,5 +1,5 @@
 # ============================================================
-# Splice Loss Prediction using a Linear Mixed-Effects Model (lme4::lmer)
+# Splice Loss Prediction using a GLMM (Gamma family, log link; lme4::glmer)
 # Author: Zhe Zhang
 # Description: Predicting optical fiber splice power losses 
 #              based on geometric features using mixed effects models
@@ -94,44 +94,47 @@ ggsave("splice_loss_by_type.png", p2, width = 8, height = 6)
 ggsave("splice_loss_vs_distance.png", p3, width = 10, height = 6)
 
 # ============================================================
-# 3. MODEL BUILDING - LINEAR MIXED-EFFECTS MODELS
+# 3. MODEL BUILDING - GLMM (GAMMA FAMILY, LOG LINK)
 # ============================================================
 
-cat("\n=== Building Mixed-Effects Models ===\n")
+cat("\n=== Building GLMM Models (Gamma, log link) ===\n")
 
 # Model 1: Basic model with fiber as random effect
-model1 <- lmer(
+model1 <- glmer(
   result ~ splice_type + fiber2_dist_center + pitch_diff + 
     (1 | fiber1) + (1 | fiber2),
   data = df,
-  REML = TRUE
+  family = Gamma(link = "log"),
+  control = glmerControl(optimizer = "bobyqa")
 )
 
-cat("\n--- Model 1: Basic LMM ---\n")
+cat("\n--- Model 1: Basic GLMM ---\n")
 summary(model1)
 
 # Model 2: Add more fixed effects
-model2 <- lmer(
+model2 <- glmer(
   result ~ splice_type + fiber2_dist_center + fiber1_dist_center + 
     pitch_diff + avg_pitch + core_no +
     (1 | fiber1) + (1 | fiber2),
   data = df,
-  REML = TRUE
+  family = Gamma(link = "log"),
+  control = glmerControl(optimizer = "bobyqa")
 )
 
-cat("\n--- Model 2: Extended LMM ---\n")
+cat("\n--- Model 2: Extended GLMM ---\n")
 summary(model2)
 
 # Model 3: Include interaction terms
-model3 <- lmer(
+model3 <- glmer(
   result ~ splice_type * fiber2_dist_center + 
     fiber1_dist_center + pitch_diff + core_no +
     (1 | fiber1) + (1 | fiber2) + (1 | test_no),
   data = df,
-  REML = TRUE
+  family = Gamma(link = "log"),
+  control = glmerControl(optimizer = "bobyqa")
 )
 
-cat("\n--- Model 3: LMM with Interactions ---\n")
+cat("\n--- Model 3: GLMM with Interactions ---\n")
 summary(model3)
 
 # ============================================================
@@ -233,7 +236,7 @@ ggsave("actual_vs_predicted.png", p6, width = 8, height = 6)
 #' @return Predicted splice loss values
 predict_splice_loss <- function(new_data, model = final_model) {
   predictions <- predict(model, newdata = new_data, 
-                         allow.new.levels = TRUE)
+                         allow.new.levels = TRUE, type = "response")
   return(predictions)
 }
 

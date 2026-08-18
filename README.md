@@ -1,6 +1,6 @@
-# Splice Loss Mixed-Effects Model
+# Splice Loss GLMM Model
 
-Predicting optical fiber splice power losses based on geometric features using linear mixed-effects models (`lme4`).
+Predicting optical fiber splice power losses based on geometric features using generalized linear mixed models (`lme4::glmer`, Gamma family with log link).
 
 ## Overview
 
@@ -10,7 +10,7 @@ This project provides a complete workflow for analyzing and predicting splice lo
 
 - Data preprocessing and feature engineering
 - Exploratory data analysis with visualizations
-- Multiple mixed-effects model comparison (AIC/BIC, likelihood ratio tests)
+- Multiple GLMM comparison (AIC/BIC, likelihood ratio tests)
 - Model diagnostics (residual plots, Q-Q plots)
 - Prediction functions for new data
 - Configurable via YAML configuration file
@@ -26,7 +26,7 @@ splice-loss-model/
 │   ├── utils.R            # Utility functions
 │   ├── data_processing.R  # Data loading and preprocessing
 │   ├── visualization.R    # Plotting functions
-│   ├── modeling.R         # Mixed-effects model building (lme4::lmer)
+│   ├── modeling.R         # GLMM building (lme4::glmer, Gamma log link)
 │   └── prediction.R       # Prediction functions
 ├── tests/                 # Unit tests
 │   └── testthat/
@@ -135,7 +135,7 @@ Edit `config.yaml` to customize:
 
 ## Model Description
 
-The mixed-effects model structure (fitted with `lme4::lmer`):
+The GLMM structure (fitted with `lme4::glmer`, Gamma family, log link — splice loss in dB is strictly positive and right-skewed, so it is modeled on its natural scale, with predictions returned on the response scale):
 
 ```
 splice_loss ~ splice_type + fiber1_dist_center + fiber2_dist_center +

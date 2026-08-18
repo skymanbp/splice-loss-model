@@ -1,5 +1,5 @@
 # ============================================================
-# Visualization Functions for Splice Loss Mixed-Effects Model
+# Visualization Functions for Splice Loss GLMM Model
 # ============================================================
 
 #' Create all exploratory data analysis plots

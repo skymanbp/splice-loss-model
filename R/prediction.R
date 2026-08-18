@@ -1,24 +1,25 @@
 # ============================================================
-# Prediction Functions for Splice Loss Mixed-Effects Model
+# Prediction Functions for Splice Loss GLMM Model
 # ============================================================
 
 #' Predict splice loss for new data
 #' @param new_data Data frame with required predictors
-#' @param model Fitted lmer model
+#' @param model Fitted glmer model
 #' @param allow_new_levels Allow prediction for new factor levels
 #' @return Vector of predicted splice loss values
 predict_splice_loss <- function(new_data, model, allow_new_levels = TRUE) {
   predictions <- predict(
     model,
     newdata = new_data,
-    allow.new.levels = allow_new_levels
+    allow.new.levels = allow_new_levels,
+    type = "response"
   )
   return(predictions)
 }
 
 #' Predict with confidence intervals using bootstrap
 #' @param new_data Data frame with required predictors
-#' @param model Fitted lmer model
+#' @param model Fitted glmer model
 #' @param n_boot Number of bootstrap iterations
 #' @param conf_level Confidence level (default 0.95)
 #' @return Data frame with predictions and confidence intervals
@@ -28,7 +29,7 @@ predict_with_ci <- function(new_data, model, n_boot = 100, conf_level = 0.95) {
   }
 
   # Point predictions
-  point_pred <- predict(model, newdata = new_data, allow.new.levels = TRUE)
+  point_pred <- predict(model, newdata = new_data, allow.new.levels = TRUE, type = "response")
 
   # Bootstrap for confidence intervals
   boot_preds <- matrix(NA, nrow = nrow(new_data), ncol = n_boot)
@@ -37,7 +38,7 @@ predict_with_ci <- function(new_data, model, n_boot = 100, conf_level = 0.95) {
   tryCatch({
     boot_samples <- lme4::bootMer(
       model,
-      FUN = function(m) predict(m, newdata = new_data, allow.new.levels = TRUE),
+      FUN = function(m) predict(m, newdata = new_data, allow.new.levels = TRUE, type = "response"),
       nsim = n_boot,
       use.u = TRUE,
       type = "parametric"

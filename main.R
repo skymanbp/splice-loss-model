@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # ============================================================
-# Splice Loss Prediction using Linear Mixed-Effects Models (lme4)
+# Splice Loss Prediction using GLMM (Gamma family, log link; lme4::glmer)
 # Main Entry Script
 # Author: Zhe Zhang
 # ============================================================
@@ -25,7 +25,7 @@ source("R/prediction.R")
 required_packages <- c("lme4", "lmerTest", "readxl", "dplyr",
                        "ggplot2", "performance", "yaml")
 
-cat("=== Splice Loss Mixed-Effects Model ===\n\n")
+cat("=== Splice Loss GLMM Model ===\n\n")
 
 # Check packages
 if (!check_packages(required_packages)) {
@@ -71,7 +71,7 @@ eda_plots <- create_eda_plots(df, config, verbose)
 # 4. MODEL BUILDING
 # ============================================================
 
-log_message("Building mixed-effects models...", verbose)
+log_message("Building GLMM models...", verbose)
 
 models <- build_models(df, config, verbose)
 
