@@ -1,5 +1,5 @@
 # ============================================================
-# Prediction Functions for Splice Loss GLMM Model
+# Prediction Functions for Splice Loss Mixed-Effects Model
 # ============================================================
 
 #' Predict splice loss for new data

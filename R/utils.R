@@ -1,5 +1,5 @@
 # ============================================================
-# Utility Functions for Splice Loss GLMM Model
+# Utility Functions for Splice Loss Mixed-Effects Model
 # ============================================================
 
 #' Load configuration from YAML file

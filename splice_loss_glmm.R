@@ -1,5 +1,5 @@
 # ============================================================
-# Splice Loss Prediction using GLMM (Generalized Linear Mixed Model)
+# Splice Loss Prediction using a Linear Mixed-Effects Model (lme4::lmer)
 # Author: Zhe Zhang
 # Description: Predicting optical fiber splice power losses 
 #              based on geometric features using mixed effects models
@@ -94,10 +94,10 @@ ggsave("splice_loss_by_type.png", p2, width = 8, height = 6)
 ggsave("splice_loss_vs_distance.png", p3, width = 10, height = 6)
 
 # ============================================================
-# 3. MODEL BUILDING - GLMM
+# 3. MODEL BUILDING - LINEAR MIXED-EFFECTS MODELS
 # ============================================================
 
-cat("\n=== Building GLMM Models ===\n")
+cat("\n=== Building Mixed-Effects Models ===\n")
 
 # Model 1: Basic model with fiber as random effect
 model1 <- lmer(
@@ -107,7 +107,7 @@ model1 <- lmer(
   REML = TRUE
 )
 
-cat("\n--- Model 1: Basic GLMM ---\n")
+cat("\n--- Model 1: Basic LMM ---\n")
 summary(model1)
 
 # Model 2: Add more fixed effects
@@ -119,7 +119,7 @@ model2 <- lmer(
   REML = TRUE
 )
 
-cat("\n--- Model 2: Extended GLMM ---\n")
+cat("\n--- Model 2: Extended LMM ---\n")
 summary(model2)
 
 # Model 3: Include interaction terms
@@ -131,7 +131,7 @@ model3 <- lmer(
   REML = TRUE
 )
 
-cat("\n--- Model 3: GLMM with Interactions ---\n")
+cat("\n--- Model 3: LMM with Interactions ---\n")
 summary(model3)
 
 # ============================================================

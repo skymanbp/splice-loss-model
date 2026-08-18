@@ -1,5 +1,5 @@
 # ============================================================
-# Data Processing Functions for Splice Loss GLMM Model
+# Data Processing Functions for Splice Loss Mixed-Effects Model
 # ============================================================
 
 #' Load and preprocess splice data

@@ -1,10 +1,10 @@
 Package: spliceloss
-Title: Splice Loss Prediction Using GLMM
+Title: Splice Loss Prediction Using Linear Mixed-Effects Models
 Version: 1.0.0
 Authors@R:
     person("Zhe", "Zhang", , "skymanbp@users.noreply.github.com", role = c("aut", "cre"))
 Description: Predicting optical fiber splice power losses based on geometric
-    features using Generalized Linear Mixed Models (GLMM). This package provides
+    features using linear mixed-effects models (lme4::lmer). This package provides
     tools for data preprocessing, model building, comparison, diagnostics, and
     prediction for fiber optic splice loss analysis.
 License: MIT + file LICENSE

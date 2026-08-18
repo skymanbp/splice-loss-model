@@ -1,8 +1,8 @@
 # ============================================================
-# Modeling Functions for Splice Loss GLMM Model
+# Modeling Functions for Splice Loss Mixed-Effects Model
 # ============================================================
 
-#' Build multiple GLMM models for comparison
+#' Build multiple linear mixed-effects models for comparison
 #' @param df Processed data frame
 #' @param config Configuration list
 #' @param verbose Print messages
@@ -12,7 +12,7 @@ build_models <- function(df, config, verbose = TRUE) {
     stop("Package 'lme4' is required. Install with: install.packages('lme4')")
   }
 
-  if (verbose) log_message("Building GLMM models...")
+  if (verbose) log_message("Building mixed-effects models...")
 
   use_reml <- config$model$use_reml
 
