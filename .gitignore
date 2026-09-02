@@ -42,3 +42,6 @@ renv/library/
 renv/staging/
 renv/python/
 renv/.lock
+# cc-enforcer index / cc-memory state: machine-local, never content
+.ce/
+.ccm/
