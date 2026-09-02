@@ -10,7 +10,7 @@ This project provides a complete workflow for analyzing and predicting splice lo
 
 - Data preprocessing and feature engineering
 - Exploratory data analysis with visualizations
-- Multiple GLMM comparison (AIC/BIC, likelihood ratio tests)
+- Multiple GLMM comparison (AIC/BIC, likelihood ratio tests) — reported for information only; `compare_models()` always returns the extended model
 - Model diagnostics (residual plots, Q-Q plots)
 - Prediction functions for new data
 - Configurable via YAML configuration file
@@ -46,12 +46,13 @@ splice-loss-model/
 ```r
 install.packages(c(
   "lme4",        # Mixed effects models
-  "lmerTest",    # P-values for lmer
+  "lmerTest",    # Loaded by main.R; inert for the Gamma glmer fits
   "readxl",      # Excel file reading
   "dplyr",       # Data manipulation
   "ggplot2",     # Visualization
   "performance", # Model diagnostics
-  "yaml"         # Configuration parsing
+  "yaml",        # Configuration parsing
+  "rstudioapi"   # Only for the interactive source("main.R") path (main.R:10)
 ))
 ```
 
@@ -67,11 +68,21 @@ cd splice-loss-model
 ### Quick Start
 
 1. Place your data file (`splice_data.xlsx`) in the `data/` directory
-2. Run the main script:
+2. Run the main script from the repository root:
+
+```bash
+Rscript main.R
+```
+
+From an interactive R session instead:
 
 ```r
 source("main.R")
 ```
+
+That second path takes the `interactive()` branch at `main.R:9-11`, which calls
+`rstudioapi::getSourceEditorContext()`, so it also needs the `rstudioapi`
+package (RStudio only).
 
 ### Using Individual Modules
 
@@ -109,7 +120,10 @@ predicted_loss <- predict_splice_loss(new_data, comparison$selected_model)
 
 ## Data Format
 
-The input Excel file should contain the following columns:
+Columns are mapped **by position, not by header name**: `apply_column_mapping()`
+(`R/data_processing.R:59-74`) overwrites `colnames(df)` with the
+`data.column_mapping` list from `config.yaml`. The input Excel file must
+therefore carry these 15 columns in this order:
 
 | Column | Description | Unit |
 |--------|-------------|------|
@@ -118,35 +132,50 @@ The input Excel file should contain the following columns:
 | splice_type | Type of splice (Self/Cross) | - |
 | test_no | Test number | - |
 | core_no | Core number | - |
-| result | Splice loss (target variable) | dB |
+| ref | Pre-splice reference power level (dropped via `columns_to_remove`) | dB |
+| result | Measured power level after splice (model response) | dB |
+| diff | `result - ref` | dB |
+| prooftest | Prooftest reading | (unknown) |
 | fiber1_dist_center | Fiber 1 distance to center | micron |
 | fiber2_dist_center | Fiber 2 distance to center | micron |
 | fiber1_pitch | Fiber 1 pitch angle | degrees |
 | fiber2_pitch | Fiber 2 pitch angle | degrees |
+| ffw | ffw reading | (unknown) |
+| unnamed | Trailing column with no header (dropped via `columns_to_remove`) | - |
 
 ## Configuration
 
 Edit `config.yaml` to customize:
 
 - Input/output file paths
-- Model parameters
+- Confidence level for intervals (`model.confidence_level` is the only key of the
+  `model` block that any code reads; the response, effect lists and formulas are
+  hard-coded in `R/modeling.R:19-47`)
 - Visualization settings
 - Logging options
 
 ## Model Description
 
-The GLMM structure (fitted with `lme4::glmer`, Gamma family, log link — splice loss in dB is strictly positive and right-skewed, so it is modeled on its natural scale, with predictions returned on the response scale):
+The GLMM structure (fitted with `lme4::glmer`, Gamma family, log link, with
+predictions returned on the response scale). The response is the `result`
+column, and the formula is hard-coded at `R/modeling.R:29-36`:
 
 ```
-splice_loss ~ splice_type + fiber1_dist_center + fiber2_dist_center +
-              pitch_diff + avg_pitch + core_no +
-              (1 | fiber1) + (1 | fiber2)
+result ~ splice_type + fiber2_dist_center + fiber1_dist_center +
+         pitch_diff + avg_pitch + core_no +
+         (1 | fiber1) + (1 | fiber2)
 ```
+
+`Gamma(link = "log")` requires a strictly positive response. The `result`
+column of `data/splice_data.xlsx` holds measured power levels that are negative
+throughout (1092 rows, min -7.773 dB, max -1.19 dB), so a strictly positive
+response has to be supplied before these fits will run.
 
 **Fixed Effects:**
 - Splice type (Self vs Cross)
 - Fiber distances to center
 - Pitch difference and average
+- Core number
 
 **Random Effects:**
 - Fiber 1 ID (random intercept)
@@ -158,7 +187,7 @@ The analysis generates:
 
 - **Plots**: Distribution, boxplots, scatter plots, diagnostic plots
 - **Model file**: `splice_loss_glmm_model.rds`
-- **Summary report**: Model coefficients and performance metrics
+- **Summary report**: Observation count, effect structure (names only) and marginal/conditional R2
 
 ## Running Tests
 
