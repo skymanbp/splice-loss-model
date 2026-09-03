@@ -113,7 +113,7 @@ new_data <- data.frame(
   fiber2_dist_center = median(df$fiber2_dist_center),
   pitch_diff = median(df$pitch_diff),
   avg_pitch = median(df$avg_pitch),
-  core_no = factor("2", levels = levels(df$core_no)),
+  core_no = factor("1", levels = levels(df$core_no)),
   fiber1 = df$fiber1[1],
   fiber2 = df$fiber2[1]
 )
@@ -126,7 +126,7 @@ predicted_loss <- predict_splice_loss(new_data, comparison$selected_model)
 ## Data Format
 
 Columns are mapped **by position, not by header name**: `apply_column_mapping()`
-(`R/data_processing.R:59-74`) overwrites `colnames(df)` with the
+(`R/data_processing.R:62-77`) overwrites `colnames(df)` with the
 `data.column_mapping` list from `config.yaml`. The input Excel file must
 therefore carry these 15 columns in this order:
 
