@@ -8,9 +8,9 @@ This project provides a complete workflow for analyzing and predicting splice lo
 
 ## Features
 
-- Data preprocessing and feature engineering
+- Data preprocessing and feature engineering, including the `splice_loss = -diff` response
 - Exploratory data analysis with visualizations
-- Multiple GLMM comparison (AIC/BIC, likelihood ratio tests) — reported for information only; `compare_models()` always returns the extended model
+- Multiple GLMM comparison (AIC/BIC, likelihood ratio tests) — reported for information only; `compare_models()` always returns the extended model, because AIC and BIC disagree on the reference data (see [Model selection](#model-selection))
 - Model diagnostics (residual plots, Q-Q plots)
 - Prediction functions for new data
 - Configurable via YAML configuration file
@@ -31,7 +31,8 @@ splice-loss-model/
 ├── tests/                 # Unit tests
 │   └── testthat/
 ├── data/                  # Data files (not tracked)
-├── output/                # Generated outputs
+├── output/                # Generated outputs (gitignored in full)
+├── CHANGELOG.md           # Release notes
 ├── DESCRIPTION            # R package metadata
 └── LICENSE                # MIT License
 ```
@@ -103,13 +104,15 @@ df <- load_and_preprocess_data(config)
 models <- build_models(df, config)
 comparison <- compare_models(models)
 
-# Make predictions
+# Make predictions. The model has a log link, so keep the continuous
+# predictors inside the observed range — distances run around 28 micron in
+# the reference data, and 0.5 micron would extrapolate by a factor of e^28.
 new_data <- data.frame(
   splice_type = factor("Cross splice", levels = levels(df$splice_type)),
-  fiber1_dist_center = 0.5,
-  fiber2_dist_center = 0.8,
-  pitch_diff = 0.2,
-  avg_pitch = 40.3,
+  fiber1_dist_center = median(df$fiber1_dist_center),
+  fiber2_dist_center = median(df$fiber2_dist_center),
+  pitch_diff = median(df$pitch_diff),
+  avg_pitch = median(df$avg_pitch),
   core_no = factor("2", levels = levels(df$core_no)),
   fiber1 = df$fiber1[1],
   fiber2 = df$fiber2[1]
@@ -117,6 +120,8 @@ new_data <- data.frame(
 
 predicted_loss <- predict_splice_loss(new_data, comparison$selected_model)
 ```
+
+`create_example_data(df)` builds exactly this one-row frame for you.
 
 ## Data Format
 
@@ -132,9 +137,9 @@ therefore carry these 15 columns in this order:
 | splice_type | Type of splice (Self/Cross) | - |
 | test_no | Test number | - |
 | core_no | Core number | - |
-| ref | Pre-splice reference power level (dropped via `columns_to_remove`) | dB |
-| result | Measured power level after splice (model response) | dB |
-| diff | `result - ref` | dB |
+| ref | Pre-splice reference power level (dropped via `columns_to_remove`; it enters the response through `diff`) | dB |
+| result | Measured power level after splice — a level, not a loss; negative throughout | dB |
+| diff | `result - ref`; the model response is `splice_loss = -diff` | dB |
 | prooftest | Prooftest reading | (unknown) |
 | fiber1_dist_center | Fiber 1 distance to center | micron |
 | fiber2_dist_center | Fiber 2 distance to center | micron |
@@ -148,28 +153,70 @@ therefore carry these 15 columns in this order:
 Edit `config.yaml` to customize:
 
 - Input/output file paths
-- Confidence level for intervals (`model.confidence_level` is the only key of the
-  `model` block that any code reads; the response, effect lists and formulas are
-  hard-coded in `R/modeling.R:19-47`)
+- Column mapping and `columns_to_remove`
+- The non-positive-loss rule: `data.drop_nonpositive_loss` and `data.min_loss_db`,
+  both read by `filter_nonpositive_loss()` (`R/data_processing.R:152-182`)
+- Confidence level for intervals (`model.confidence_level` and the two `data`
+  filter keys above are the only model-affecting keys any code reads;
+  `model.response`, the effect lists and the formulas are documentation —
+  the formulas are hard-coded in `R/modeling.R:38-66`)
 - Visualization settings
 - Logging options
 
 ## Model Description
 
 The GLMM structure (fitted with `lme4::glmer`, Gamma family, log link, with
-predictions returned on the response scale). The response is the `result`
-column, and the formula is hard-coded at `R/modeling.R:29-36`:
+predictions returned on the response scale). The response is `splice_loss`,
+and the formula is hard-coded at `R/modeling.R:48-55`:
 
 ```
-result ~ splice_type + fiber2_dist_center + fiber1_dist_center +
-         pitch_diff + avg_pitch + core_no +
-         (1 | fiber1) + (1 | fiber2)
+splice_loss ~ splice_type + fiber2_dist_center + fiber1_dist_center +
+              pitch_diff + avg_pitch + core_no +
+              (1 | fiber1) + (1 | fiber2)
 ```
 
-`Gamma(link = "log")` requires a strictly positive response. The `result`
-column of `data/splice_data.xlsx` holds measured power levels that are negative
-throughout (1092 rows, min -7.773 dB, max -1.19 dB), so a strictly positive
-response has to be supplied before these fits will run.
+### The response: `splice_loss = -diff`
+
+`ref` and `result` are absolute optical power levels in dB, both negative
+throughout the reference workbook (`result`: 1092 rows, min -7.773 dB, max
+-1.19 dB). Neither is a loss. The workbook's `diff` column is `result - ref`,
+so the power lost across the splice is
+
+```
+splice_loss = ref - result = -diff
+```
+
+which is positive for a lossy splice and zero for a lossless one. It is
+derived in `create_derived_features()` (`R/data_processing.R:112-134`), which
+errors out if `diff` is absent. On the reference data the loss has mean
+0.1395 dB, sd 0.3239 dB and max 2.8506 dB.
+
+### Non-positive losses
+
+`Gamma(link = "log")` requires a strictly positive response. A splice with no
+measurable loss reads at or just below zero, because the pre- and post-splice
+power readings differ only by measurement noise — on the reference data the 35
+non-positive rows (22 negative, 13 exactly zero, all within 0.02 dB of zero)
+sit well inside the instrument's resolution.
+
+`filter_nonpositive_loss()` (`R/data_processing.R:152-182`) drops them after
+`na.omit()` and logs the count and the reason. The rule is explicit in
+`config.yaml`:
+
+```yaml
+data:
+  drop_nonpositive_loss: true   # keep rows where splice_loss > min_loss_db
+  min_loss_db: 0.0
+```
+
+Set `drop_nonpositive_loss: false` only alongside a family that admits zeros
+(Tweedie, for instance); the Gamma fits will fail otherwise, and
+`build_models()` refuses to start on a response with non-positive values
+rather than letting `glmer` fail deeper in. On the reference data the rule
+takes 1092 raw rows to 1088 after `na.omit()` and 1053 into the fits.
+
+The family was not changed: the Gamma fits converge on the filtered data, so
+no Tweedie substitution was needed.
 
 **Fixed Effects:**
 - Splice type (Self vs Cross)
@@ -181,13 +228,65 @@ response has to be supplied before these fits will run.
 - Fiber 1 ID (random intercept)
 - Fiber 2 ID (random intercept)
 
+### Singular fit
+
+On the reference data the extended and interaction models both report
+`boundary (singular) fit`: the `fiber1` intercept variance is estimated at
+exactly zero while `fiber2` carries SD 0.831. This is structural, not an
+optimizer artifact. There are only 11 distinct fibers (7 in the `fiber1`
+column, 10 in `fiber2`), and once `fiber1_dist_center`, `avg_pitch` and
+`core_no` enter as fixed effects there is no residual between-`fiber1`
+variation left to estimate — the basic model, which omits those terms, fits
+`fiber1` at SD 0.175 and is not singular. Refitting with `Nelder_Mead`
+reproduces the same boundary (`fiber1` SD 0.0012, identical log-likelihood).
+
+The model is kept as documented and the warning is left visible rather than
+suppressed. One consequence is that `performance::r2()` cannot compute a
+conditional R2 on a boundary fit and returns `NA` for it; the marginal R2
+(0.289) is still reported.
+
+`build_models()` passes `optCtrl = list(maxfun = 2e5)` to `bobyqa`
+(`R/modeling.R:34-35`). At lme4's default budget the extended and interaction
+fits stop with "maximum number of function evaluations exceeded" before
+reaching the optimum; with the raised budget that warning is gone and only the
+singularity remains.
+
+### Model selection
+
+On the reference data AIC and BIC disagree:
+
+| Model | AIC | BIC |
+|---|---|---|
+| basic | -2961.11 | -2926.40 |
+| extended | -3012.32 | -2952.81 |
+| interactions | -3014.61 | -2950.14 |
+
+The extended model improves decisively on the basic one (LRT chi2 = 61.21 on
+5 df, p = 6.8e-12). Adding the interaction and the `test_no` random intercept
+buys 2.29 AIC (LRT chi2 = 4.29 on 1 df, p = 0.038) but costs 2.67 BIC. That is
+a modelling judgement rather than something a single criterion settles, so
+`compare_models()` keeps returning `extended` and reports the table for the
+reader to weigh.
+
+### Predicting outside the observed range
+
+The link is logarithmic, so an out-of-range covariate is exponentiated into a
+meaningless number. In the reference data both distances to center run around
+28 micron (`fiber1_dist_center` 28.33-28.93, `fiber2_dist_center`
+26.79-29.06). `create_example_data()` (`R/prediction.R:78-97`) therefore
+takes column medians from the fitted data rather than hard-coded constants.
+
 ## Output
 
-The analysis generates:
+Everything the pipeline writes lands in `output/`, which is gitignored in
+full — generated plots, models and summaries are never committed.
 
 - **Plots**: Distribution, boxplots, scatter plots, diagnostic plots
 - **Model file**: `splice_loss_glmm_model.rds`
-- **Summary report**: Observation count, effect structure (names only) and marginal/conditional R2
+- **Summary report**: `output/model_summary.txt` — observation count, effect
+  structure (names only) and marginal/conditional R2. The conditional R2 reads
+  `NA` on the reference data because the selected fit is singular; see
+  [Singular fit](#singular-fit).
 
 ## Running Tests
 

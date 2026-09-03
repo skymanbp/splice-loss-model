@@ -22,15 +22,28 @@ data:
     - fiber2_pitch
     - ffw
     - unnamed
-  # Columns to remove
+  # Columns to remove. `ref` is dropped because it enters the response
+  # through `diff` (= result - ref); keeping it would put the same
+  # information on both sides of the model.
   columns_to_remove:
     - unnamed
     - ref
 
+  # Response filtering. Gamma(link = "log") needs a strictly positive
+  # response, and a splice with no measurable loss reads at or just below
+  # zero because the pre- and post-splice power readings differ only by
+  # measurement noise. Rows are kept when splice_loss > min_loss_db.
+  # Set drop_nonpositive_loss to false only if you also switch to a family
+  # that admits zeros (e.g. Tweedie); the Gamma fits will fail otherwise.
+  drop_nonpositive_loss: true
+  min_loss_db: 0.0
+
 # Model settings
 model:
-  # Target variable
-  response: "result"
+  # Target variable: power lost across the splice, derived in
+  # create_derived_features() as splice_loss = -diff = ref - result.
+  # `result` is a post-splice power level (negative throughout), not a loss.
+  response: "splice_loss"
 
   # Fixed effects for the final model
   fixed_effects:

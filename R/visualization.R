@@ -41,7 +41,7 @@ create_eda_plots <- function(df, config, verbose = TRUE) {
 #' @param viz_config Visualization configuration
 #' @return ggplot object
 create_distribution_plot <- function(df, viz_config) {
-  ggplot2::ggplot(df, ggplot2::aes(x = result)) +
+  ggplot2::ggplot(df, ggplot2::aes(x = splice_loss)) +
     ggplot2::geom_histogram(
       bins = viz_config$histogram_bins,
       fill = viz_config$colors$primary,
@@ -61,7 +61,7 @@ create_distribution_plot <- function(df, viz_config) {
 #' @param viz_config Visualization configuration
 #' @return ggplot object
 create_boxplot_by_type <- function(df, viz_config) {
-  ggplot2::ggplot(df, ggplot2::aes(x = splice_type, y = result, fill = splice_type)) +
+  ggplot2::ggplot(df, ggplot2::aes(x = splice_type, y = splice_loss, fill = splice_type)) +
     ggplot2::geom_boxplot(alpha = 0.7) +
     ggplot2::labs(
       title = "Splice Loss by Splice Type",
@@ -77,7 +77,7 @@ create_boxplot_by_type <- function(df, viz_config) {
 #' @param viz_config Visualization configuration
 #' @return ggplot object
 create_scatter_plot <- function(df, viz_config) {
-  ggplot2::ggplot(df, ggplot2::aes(x = avg_dist_center, y = result, color = splice_type)) +
+  ggplot2::ggplot(df, ggplot2::aes(x = avg_dist_center, y = splice_loss, color = splice_type)) +
     ggplot2::geom_point(alpha = viz_config$point_alpha) +
     ggplot2::geom_smooth(method = "lm", se = TRUE) +
     ggplot2::labs(
@@ -152,17 +152,21 @@ create_qq_plot <- function(df, viz_config) {
 }
 
 #' Create actual vs predicted plot
+#'
+#' Both axes are on the response scale: the observed `splice_loss` against
+#' the model's fitted loss, in dB.
+#'
 #' @param df Data frame
 #' @param viz_config Visualization configuration
 #' @return ggplot object
 create_actual_vs_predicted_plot <- function(df, viz_config) {
-  ggplot2::ggplot(df, ggplot2::aes(x = result, y = fitted)) +
+  ggplot2::ggplot(df, ggplot2::aes(x = splice_loss, y = fitted)) +
     ggplot2::geom_point(alpha = viz_config$point_alpha, color = viz_config$colors$primary) +
     ggplot2::geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = viz_config$colors$line) +
     ggplot2::labs(
       title = "Actual vs Predicted Splice Loss",
-      x = "Actual (dB)",
-      y = "Predicted (dB)"
+      x = "Actual splice loss (dB)",
+      y = "Predicted splice loss (dB)"
     ) +
     ggplot2::theme_minimal()
 }

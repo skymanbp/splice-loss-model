@@ -65,15 +65,30 @@ predict_with_ci <- function(new_data, model, n_boot = 100, conf_level = 0.95) {
 }
 
 #' Create example prediction data
-#' @param df Original data frame (for factor levels)
-#' @return Example data frame for prediction
+#'
+#' The continuous predictors are taken as column medians of `df` rather than
+#' hard-coded, so the example always sits inside the observed range. This
+#' matters because the model has a log link: distances in the reference data
+#' run around 28 micron, and the previously hard-coded 0.5 / 0.8 micron
+#' extrapolated roughly 28 micron below the data, which the exponential turned
+#' into a predicted loss of order 1e10 dB.
+#'
+#' @param df Original data frame (for factor levels and predictor ranges)
+#' @return One-row example data frame for prediction
 create_example_data <- function(df) {
+  med <- function(column) {
+    if (!(column %in% colnames(df))) {
+      stop(sprintf("Column '%s' not found in df", column))
+    }
+    stats::median(df[[column]], na.rm = TRUE)
+  }
+
   example_data <- data.frame(
     splice_type = factor("Cross splice", levels = levels(df$splice_type)),
-    fiber1_dist_center = 0.5,
-    fiber2_dist_center = 0.8,
-    pitch_diff = 0.2,
-    avg_pitch = 40.3,
+    fiber1_dist_center = med("fiber1_dist_center"),
+    fiber2_dist_center = med("fiber2_dist_center"),
+    pitch_diff = med("pitch_diff"),
+    avg_pitch = med("avg_pitch"),
     core_no = factor(levels(df$core_no)[1], levels = levels(df$core_no)),
     fiber1 = df$fiber1[1],
     fiber2 = df$fiber2[1]

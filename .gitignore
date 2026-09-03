@@ -9,10 +9,10 @@
 *.tar.gz
 *.Rcheck/
 
-# Output files
-output/*.png
-output/*.rds
-output/*.csv
+# Output files: everything the pipeline writes is generated, never committed.
+# The whole directory is ignored, not just the plot/model extensions, so
+# output/model_summary.txt (config.yaml logging.summary_file) stays out too.
+output/
 *.png
 *.rds
 

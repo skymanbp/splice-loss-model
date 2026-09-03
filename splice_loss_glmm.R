@@ -31,8 +31,8 @@ colnames(df) <- c("fiber1", "fiber2", "splice_type", "test_no", "core_no",
                   "fiber1_pitch", "fiber2_pitch", "ffw", "unnamed")
 
 # Remove unnecessary columns
-df <- df %>% 
-  select(-unnamed, -ref) %>%  # ref is highly correlated with result (reference value)
+df <- df %>%
+  select(-unnamed, -ref) %>%  # ref is the pre-splice level; it enters via diff
   na.omit()  # Remove rows with missing values
 
 # Create derived features
@@ -46,6 +46,11 @@ df <- df %>%
     pitch_diff = abs(fiber1_pitch - fiber2_pitch),
     # Average pitch
     avg_pitch = (fiber1_pitch + fiber2_pitch) / 2,
+    # Response: power lost across the splice, in dB.
+    # Ref and Result are absolute power levels (both negative) and
+    # Diff = Result - Ref, so loss = Ref - Result = -Diff, which is
+    # positive for a lossy splice. Result itself is a level, not a loss.
+    splice_loss = -diff,
     # Convert to factors for random effects
     fiber1 = as.factor(fiber1),
     fiber2 = as.factor(fiber2),
@@ -54,26 +59,37 @@ df <- df %>%
     test_no = as.factor(test_no)
   )
 
+# Gamma(link = "log") needs a strictly positive response. A splice with no
+# measurable loss reads at or just below zero, because the two power readings
+# differ only by measurement noise; those rows are dropped.
+n_before <- nrow(df)
+df <- df[df$splice_loss > 0, , drop = FALSE]
+cat(sprintf("Dropped %d of %d rows with splice_loss <= 0 dB\n",
+            n_before - nrow(df), n_before))
+
 # Summary of processed data
 cat("\n=== Processed Data Summary ===\n")
 cat("Number of observations:", nrow(df), "\n")
-cat("Number of fiber types:", length(unique(c(as.character(df$fiber1), 
+cat("Number of fiber types:", length(unique(c(as.character(df$fiber1),
                                                 as.character(df$fiber2)))), "\n")
 cat("Splice types:", levels(df$splice_type), "\n")
+cat(sprintf("Splice loss (dB): mean %.4f, sd %.4f, min %.4f, max %.4f\n",
+            mean(df$splice_loss), sd(df$splice_loss),
+            min(df$splice_loss), max(df$splice_loss)))
 
 # ============================================================
 # 2. EXPLORATORY DATA ANALYSIS
 # ============================================================
 
 # Distribution of splice loss
-p1 <- ggplot(df, aes(x = result)) +
+p1 <- ggplot(df, aes(x = splice_loss)) +
   geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.7) +
   labs(title = "Distribution of Splice Loss",
        x = "Splice Loss (dB)", y = "Count") +
   theme_minimal()
 
 # Splice loss by splice type
-p2 <- ggplot(df, aes(x = splice_type, y = result, fill = splice_type)) +
+p2 <- ggplot(df, aes(x = splice_type, y = splice_loss, fill = splice_type)) +
   geom_boxplot(alpha = 0.7) +
   labs(title = "Splice Loss by Splice Type",
        x = "Splice Type", y = "Splice Loss (dB)") +
@@ -81,7 +97,7 @@ p2 <- ggplot(df, aes(x = splice_type, y = result, fill = splice_type)) +
   theme(legend.position = "none")
 
 # Splice loss vs distance to center
-p3 <- ggplot(df, aes(x = avg_dist_center, y = result, color = splice_type)) +
+p3 <- ggplot(df, aes(x = avg_dist_center, y = splice_loss, color = splice_type)) +
   geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", se = TRUE) +
   labs(title = "Splice Loss vs Average Distance to Center",
@@ -99,13 +115,17 @@ ggsave("splice_loss_vs_distance.png", p3, width = 10, height = 6)
 
 cat("\n=== Building GLMM Models (Gamma, log link) ===\n")
 
+# maxfun = 2e5: at lme4's default budget the extended and interaction fits
+# stop with "maximum number of function evaluations exceeded".
+ctrl <- glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+
 # Model 1: Basic model with fiber as random effect
 model1 <- glmer(
-  result ~ splice_type + fiber2_dist_center + pitch_diff + 
+  splice_loss ~ splice_type + fiber2_dist_center + pitch_diff +
     (1 | fiber1) + (1 | fiber2),
   data = df,
   family = Gamma(link = "log"),
-  control = glmerControl(optimizer = "bobyqa")
+  control = ctrl
 )
 
 cat("\n--- Model 1: Basic GLMM ---\n")
@@ -113,12 +133,12 @@ summary(model1)
 
 # Model 2: Add more fixed effects
 model2 <- glmer(
-  result ~ splice_type + fiber2_dist_center + fiber1_dist_center + 
+  splice_loss ~ splice_type + fiber2_dist_center + fiber1_dist_center +
     pitch_diff + avg_pitch + core_no +
     (1 | fiber1) + (1 | fiber2),
   data = df,
   family = Gamma(link = "log"),
-  control = glmerControl(optimizer = "bobyqa")
+  control = ctrl
 )
 
 cat("\n--- Model 2: Extended GLMM ---\n")
@@ -126,12 +146,12 @@ summary(model2)
 
 # Model 3: Include interaction terms
 model3 <- glmer(
-  result ~ splice_type * fiber2_dist_center + 
+  splice_loss ~ splice_type * fiber2_dist_center +
     fiber1_dist_center + pitch_diff + core_no +
     (1 | fiber1) + (1 | fiber2) + (1 | test_no),
   data = df,
   family = Gamma(link = "log"),
-  control = glmerControl(optimizer = "bobyqa")
+  control = ctrl
 )
 
 cat("\n--- Model 3: GLMM with Interactions ---\n")
@@ -214,12 +234,12 @@ p5 <- ggplot(df, aes(sample = residuals)) +
        x = "Theoretical Quantiles", y = "Sample Quantiles") +
   theme_minimal()
 
-# Actual vs Predicted
-p6 <- ggplot(df, aes(x = result, y = fitted)) +
+# Actual vs Predicted (both on the response scale, in dB)
+p6 <- ggplot(df, aes(x = splice_loss, y = fitted)) +
   geom_point(alpha = 0.5, color = "steelblue") +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
   labs(title = "Actual vs Predicted Splice Loss",
-       x = "Actual (dB)", y = "Predicted (dB)") +
+       x = "Actual splice loss (dB)", y = "Predicted splice loss (dB)") +
   theme_minimal()
 
 ggsave("residuals_vs_fitted.png", p4, width = 8, height = 6)
@@ -240,18 +260,22 @@ predict_splice_loss <- function(new_data, model = final_model) {
   return(predictions)
 }
 
-# Example prediction
+# Example prediction. The continuous predictors are column medians, not
+# hard-coded constants: the model has a log link, so a covariate set outside
+# the observed range (distances run around 28 micron here) is exponentiated
+# into a meaningless prediction.
 cat("\n=== Example Prediction ===\n")
 example_data <- data.frame(
   splice_type = factor("Cross splice", levels = levels(df$splice_type)),
-  fiber1_dist_center = 0.5,
-  fiber2_dist_center = 0.8,
-  pitch_diff = 0.2,
-  avg_pitch = 40.3,
+  fiber1_dist_center = median(df$fiber1_dist_center),
+  fiber2_dist_center = median(df$fiber2_dist_center),
+  pitch_diff = median(df$pitch_diff),
+  avg_pitch = median(df$avg_pitch),
   core_no = factor("2", levels = levels(df$core_no)),
   fiber1 = df$fiber1[1],  # Use existing fiber level
   fiber2 = df$fiber2[1]
 )
+print(example_data)
 
 predicted_loss <- predict_splice_loss(example_data)
 cat("Predicted splice loss:", round(predicted_loss, 3), "dB\n")

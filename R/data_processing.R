@@ -31,7 +31,7 @@ load_and_preprocess_data <- function(config, verbose = TRUE) {
   # Remove unnecessary columns
   df <- remove_columns(df, config$data$columns_to_remove, verbose)
 
-  # Create derived features
+  # Create derived features, including the splice_loss response
   df <- create_derived_features(df, verbose)
 
   # Convert to factors
@@ -44,6 +44,9 @@ load_and_preprocess_data <- function(config, verbose = TRUE) {
   if (verbose && n_removed > 0) {
     log_message(sprintf("Removed %d rows with missing values", n_removed))
   }
+
+  # Enforce a strictly positive response for the Gamma fits
+  df <- filter_nonpositive_loss(df, config, verbose)
 
   if (verbose) {
     log_message(sprintf("Processed data: %d rows", nrow(df)))
@@ -94,11 +97,24 @@ remove_columns <- function(df, columns_to_remove, verbose = TRUE) {
 }
 
 #' Create derived features
-#' @param df Data frame
+#'
+#' Derives the model response, `splice_loss`, alongside the geometric
+#' features. The raw workbook records `ref` and `result` as absolute power
+#' levels in dB (both negative), and `diff = result - ref`. The physical
+#' quantity of interest is the power lost across the splice,
+#' `loss = ref - result = -diff`, which is positive for a lossy splice and
+#' close to zero for a lossless one. `result` itself is a power level, not a
+#' loss, so it must never be used as the response.
+#'
+#' @param df Data frame carrying at least `diff` and the pitch/distance columns
 #' @param verbose Print messages
-#' @return Data frame with derived features
+#' @return Data frame with derived features, including `splice_loss` (dB)
 create_derived_features <- function(df, verbose = TRUE) {
   if (verbose) log_message("Creating derived features...")
+
+  if (!("diff" %in% colnames(df))) {
+    stop("Column 'diff' is required to derive the response 'splice_loss' (= -diff)")
+  }
 
   df <- dplyr::mutate(df,
     # Distance difference between two fibers
@@ -108,10 +124,61 @@ create_derived_features <- function(df, verbose = TRUE) {
     # Pitch difference
     pitch_diff = abs(fiber1_pitch - fiber2_pitch),
     # Average pitch
-    avg_pitch = (fiber1_pitch + fiber2_pitch) / 2
+    avg_pitch = (fiber1_pitch + fiber2_pitch) / 2,
+    # Response: power lost across the splice, in dB.
+    # Diff = Result - Ref, so loss = Ref - Result = -Diff.
+    splice_loss = -diff
   )
 
   return(df)
+}
+
+#' Drop rows whose measured loss is not strictly positive
+#'
+#' `Gamma(link = "log")` requires a strictly positive response. A splice with
+#' no measurable loss returns `splice_loss` at or just below zero, because the
+#' pre- and post-splice power readings differ only by measurement noise. Those
+#' rows carry no information about a loss mechanism and cannot enter a Gamma
+#' likelihood, so they are dropped and the count is reported.
+#'
+#' Controlled by `data.drop_nonpositive_loss` (default `TRUE`) and
+#' `data.min_loss_db` (default `0`) in `config.yaml`: rows are kept when
+#' `splice_loss > min_loss_db`.
+#'
+#' @param df Data frame containing `splice_loss`
+#' @param config Configuration list
+#' @param verbose Print messages
+#' @return Data frame with non-positive losses removed
+filter_nonpositive_loss <- function(df, config, verbose = TRUE) {
+  drop_nonpositive <- config$data$drop_nonpositive_loss
+  if (is.null(drop_nonpositive)) drop_nonpositive <- TRUE
+  if (!isTRUE(drop_nonpositive)) {
+    if (verbose) {
+      log_message(paste("drop_nonpositive_loss is FALSE: keeping non-positive losses;",
+                        "Gamma(link = 'log') will not fit this data"))
+    }
+    return(df)
+  }
+
+  if (!("splice_loss" %in% colnames(df))) {
+    stop("Column 'splice_loss' not found; run create_derived_features() first")
+  }
+
+  min_loss <- config$data$min_loss_db
+  if (is.null(min_loss)) min_loss <- 0
+
+  keep <- df$splice_loss > min_loss
+  n_dropped <- sum(!keep)
+
+  if (verbose && n_dropped > 0) {
+    log_message(sprintf(
+      paste("Dropped %d of %d rows with splice_loss <= %g dB",
+            "(measurement noise around a lossless splice;",
+            "Gamma(link = 'log') needs a strictly positive response)"),
+      n_dropped, nrow(df), min_loss))
+  }
+
+  return(df[keep, , drop = FALSE])
 }
 
 #' Convert categorical variables to factors
@@ -149,11 +216,11 @@ print_data_summary <- function(df) {
     cat("Splice types:", paste(levels(df$splice_type), collapse = ", "), "\n")
   }
 
-  if ("result" %in% colnames(df)) {
-    cat("\nResponse variable (result) statistics:\n")
-    cat("  Mean:", round(mean(df$result, na.rm = TRUE), 4), "dB\n")
-    cat("  SD:", round(sd(df$result, na.rm = TRUE), 4), "dB\n")
-    cat("  Min:", round(min(df$result, na.rm = TRUE), 4), "dB\n")
-    cat("  Max:", round(max(df$result, na.rm = TRUE), 4), "dB\n")
+  if ("splice_loss" %in% colnames(df)) {
+    cat("\nResponse variable (splice_loss = -diff) statistics:\n")
+    cat("  Mean:", round(mean(df$splice_loss, na.rm = TRUE), 4), "dB\n")
+    cat("  SD:", round(sd(df$splice_loss, na.rm = TRUE), 4), "dB\n")
+    cat("  Min:", round(min(df$splice_loss, na.rm = TRUE), 4), "dB\n")
+    cat("  Max:", round(max(df$splice_loss, na.rm = TRUE), 4), "dB\n")
   }
 }
