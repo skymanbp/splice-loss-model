@@ -16,9 +16,8 @@ output/*.csv
 *.png
 *.rds
 
-# Data files (keep sample data)
+# Data files
 data/*.xlsx
-!data/sample_*.xlsx
 
 # IDE
 .vscode/

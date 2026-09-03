@@ -7,7 +7,7 @@
 
 # Load required libraries
 library(lme4)       # For mixed effects models
-library(lmerTest)   # For p-values in lmer
+library(lmerTest)   # Inert for the Gamma glmer fits below
 library(readxl)     # For reading Excel files
 library(dplyr)      # For data manipulation
 library(ggplot2)    # For visualization
@@ -232,7 +232,7 @@ ggsave("actual_vs_predicted.png", p6, width = 8, height = 6)
 
 #' Predict splice loss for new data
 #' @param new_data Data frame with required predictors
-#' @param model The fitted lmer model
+#' @param model The fitted glmer model
 #' @return Predicted splice loss values
 predict_splice_loss <- function(new_data, model = final_model) {
   predictions <- predict(model, newdata = new_data, 
