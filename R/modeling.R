@@ -103,7 +103,7 @@ compare_models <- function(models, verbose = TRUE) {
 }
 
 #' Analyze the final model
-#' @param model Fitted lmer model
+#' @param model Fitted glmer model
 #' @param config Configuration list
 #' @param verbose Print results
 #' @return List with model analysis results
